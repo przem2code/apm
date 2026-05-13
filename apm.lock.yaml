@@ -1,0 +1,51 @@
+lockfile_version: '1'
+generated_at: '2026-05-07T15:13:12.274722+00:00'
+apm_version: 0.12.2
+dependencies:
+- repo_url: DevExpGbb/genesis
+  host: github.com
+  resolved_commit: 16a5027d6cdc23c0fd9df21f65e21fa0f681d722
+  resolved_ref: v0.1.0
+  package_type: skill_bundle
+  deployed_files:
+  - .agents/skills/genesis
+  content_hash: sha256:4f28e525c755aa538ed7aabd8e69cdd14c62c57b19cbfc37ddca5b0707f34730
+- repo_url: DevExpGbb/zava-agent-config
+  host: github.com
+  resolved_commit: 7a12679a9e1f55e06d16616ed0244b5fdeaad3da
+  resolved_ref: v5.0.1
+  virtual_path: plugins/code-kit
+  is_virtual: true
+  package_type: marketplace_plugin
+  content_hash: sha256:bb505597414ca6787bb4cee8075c1d2f0ebc63c358792c2f4a7a5aa4dfe108a9
+- repo_url: DevExpGbb/zava-agent-config
+  host: github.com
+  resolved_commit: 7a12679a9e1f55e06d16616ed0244b5fdeaad3da
+  resolved_ref: v5.0.1
+  virtual_path: plugins/ideate-kit
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/meeting-to-issue
+  content_hash: sha256:9c33b0580db8f20706e92cbc65e0812b409dfc5d01270e4021adf7106b9a8934
+- repo_url: DevExpGbb/zava-agent-config
+  host: github.com
+  resolved_commit: 7a12679a9e1f55e06d16616ed0244b5fdeaad3da
+  resolved_ref: v5.0.1
+  virtual_path: plugins/review-kit
+  is_virtual: true
+  package_type: marketplace_plugin
+  deployed_files:
+  - .agents/skills/panel-review
+  content_hash: sha256:6c34beac889dab8124b1c8f08783390264d976764d9b9012af3d0ea069ec5b22
+- repo_url: DevExpGbb/zava-agent-config
+  host: github.com
+  resolved_commit: 7a12679a9e1f55e06d16616ed0244b5fdeaad3da
+  resolved_ref: v5.0.1
+  virtual_path: plugins/secure-baseline
+  is_virtual: true
+  package_type: marketplace_plugin
+  content_hash: sha256:b415e1715cf537747ea8312137fa129a154e46abfe50f4a97594fd40b0f1befe
+local_deployed_files:
+- .agents/skills/framework-modernizer
+- .agents/skills/my-skill

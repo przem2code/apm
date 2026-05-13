@@ -1,0 +1,127 @@
+name: release
+
+# Cuts a release of this skill on every v*.*.* tag push.
+#
+# 1. Validates SKILL.md against the open agentskills.io spec
+#    (gh skill publish --dry-run).
+# 2. Packs the skill into an APM-compatible tarball
+#    (apm pack --offline --archive).
+# 3. Creates a GitHub Release with the tarball + sha256 attached.
+#
+# Trainees: tag your skill once you've built and tested it.
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Partner repos can then pin via:
+#
+#   dependencies:
+#     apm:
+#       - <your-org>/<your-repo>#v0.1.0
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'        # plain semver: v0.1.0
+      - 'v*.*.*-*'      # per-track suffix: v0.1.0-test-improver (workshop pattern)
+
+permissions:
+  contents: write   # required to create the release + upload assets
+
+jobs:
+  release:
+    name: Validate · Pack · Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup APM CLI
+        uses: microsoft/apm-action@v1
+        with:
+          setup-only: 'true'
+
+      - name: Extract release metadata
+        id: meta
+        run: |
+          # Strip leading 'v' and any per-track suffix (e.g. v0.1.0-test-improver → 0.1.0)
+          ref="${GITHUB_REF_NAME#v}"
+          version="${ref%%-*}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          name=$(grep -E '^name:' apm.yml | head -1 | awk '{print $2}' | tr -d '"')
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version alignment (tag == apm.yml)
+        run: |
+          tag_ver="${{ steps.meta.outputs.version }}"
+          apm_ver=$(grep -E '^version:' apm.yml | head -1 | awk '{print $2}' | tr -d '"')
+          if [ "$tag_ver" != "$apm_ver" ]; then
+            echo "::error::Tag version $tag_ver does not match apm.yml version $apm_ver (tags may be suffixed e.g. v0.1.0-skill-name; the leading semver must match)"
+            exit 1
+          fi
+          echo "Version aligned at v$tag_ver"
+
+      - name: Validate skill against agentskills.io spec
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Install the gh-skill extension if missing (preview surface; matches the
+          # README §0 path). Avoids sudo/apt mutation of the runner.
+          if ! gh skill --help &>/dev/null; then
+            gh extension install github/gh-skill
+          fi
+          if [ ! -d ".apm/skills" ]; then
+            echo "::warning::No skills found at .apm/skills/ — nothing to validate."
+            exit 0
+          fi
+          gh skill publish --dry-run .apm
+
+      - name: Pack skill (APM tarball)
+        run: apm pack --offline --archive
+
+      - name: Audit packed skill (hidden-character / homoglyph guard)
+        run: |
+          # Hard-fail on any hidden-character / homoglyph finding. apm pack only
+          # warns; a release pipeline must not ship smuggled characters in a
+          # skill that other repos will execute. See `apm audit --help`.
+          apm audit --ci
+
+      - name: Stage release assets
+        id: stage
+        run: |
+          mkdir -p dist
+          tarball=$(find . -maxdepth 3 -name '*.tar.gz' -type f -not -path './dist/*' | head -1)
+          if [ -z "$tarball" ]; then
+            echo "::error::No tarball produced by apm pack"
+            exit 1
+          fi
+          name="${{ steps.meta.outputs.name }}"
+          version="${{ steps.meta.outputs.version }}"
+          asset="dist/${name}-${version}.tar.gz"
+          cp "$tarball" "$asset"
+          (cd dist && sha256sum "${name}-${version}.tar.gz" > "${name}-${version}.tar.gz.sha256")
+          ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.meta.outputs.name }} ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+          body: |
+            ## ${{ steps.meta.outputs.name }} ${{ github.ref_name }}
+
+            Packaged release of `${{ steps.meta.outputs.name }}` (APM tarball + sha256).
+
+            Pin from another repo's `apm.yml`:
+
+            ```yaml
+            dependencies:
+              apm:
+                - ${{ github.repository }}#${{ github.ref_name }}
+            ```

@@ -1,0 +1,5 @@
+# Synthetic-fixture expected output — exercises branches not present in the
+# live security-fixtures audit today (fix-via-force boolean + manual-review false).
+# Source: docs/golden-examples/dependency-auditor.evals/fixtures/manual-review-fixture.json
+abandoned-pkg	high	manual-review	
+top-level-dep	moderate	fix-via-force	

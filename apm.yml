@@ -1,0 +1,61 @@
+name: my-workshop-skill
+version: 0.1.0
+description: >-
+  Workshop trainee starter — fork this template, build a skill in
+  .apm/skills/my-skill/, run it locally against zava-storefront/, then publish
+  via gh skill + apm pack on tag.
+author: <your name>
+license: UNLICENSED
+keywords:
+  - workshop
+  - apm
+  - agent-skill
+
+# Explicit consent: ship everything under .apm/ when packing.
+# (See https://microsoft.github.io/apm/reference/manifest-schema/#39-includes)
+includes: auto
+
+# Runtime dependencies of YOUR skill (what consumers of your packed bundle
+# would need). Empty by default — your skill is self-contained.
+dependencies:
+  apm: []
+  mcp: []
+
+# Author-time tooling. These ship the personas, instructions, and the
+# Genesis-style design surface you lean on while authoring your skill.
+# `apm pack` excludes devDependencies from the bundle, so consumers who
+# install your skill don't pull these in.
+# (See https://microsoft.github.io/apm/guides/dev-only-primitives/)
+devDependencies:
+  apm:
+    # Workshop kits — personas, prose-style rules, review panels.
+    - DevExpGbb/zava-agent-config/plugins/secure-baseline#v5.0.1
+    - DevExpGbb/zava-agent-config/plugins/code-kit#v5.0.1
+    - DevExpGbb/zava-agent-config/plugins/ideate-kit#v5.0.1
+    - DevExpGbb/zava-agent-config/plugins/review-kit#v5.0.1
+    # Genesis — the design assistant for new skills. Run it via your IDE
+    # to scope your skill before writing SKILL.md. Mirrored in DevExpGbb so
+    # the workshop installs cleanly under the org allowlist policy.
+    # Pinned to v0.1.0 so every trainee gets identical /genesis behavior.
+    - DevExpGbb/genesis#v0.1.0
+
+scripts:
+  # Pack this skill for distribution. CI runs the same on tag push.
+  pack: apm pack --offline --archive
+
+  # Validate against the open agent-skills.io spec before publishing.
+  validate: gh skill publish --dry-run .apm
+
+  # Track 3 trainees: run the dependency-auditor RUBRIC REGRESSION TEST
+  # against zava-storefront/security-fixtures/. Catches rubric drift when
+  # the npm advisory database evolves OR when classify() is edited
+  # without updating the expected file. NOT a behavior eval — see the
+  # agentskills.io-style behavior evals at evals.json + triggers.json
+  # (Layer 1) in that folder. README documents both layers.
+  regression-track-3: node docs/golden-examples/dependency-auditor.evals/run.js
+
+  # Track 4 trainees: run the framework-modernizer CATALOG REGRESSION
+  # TEST (regex catalog vs deliberate fixture). Same Layer-2 shape as
+  # regression-track-3. Behavior evals live at evals/evals.json +
+  # evals/triggers.json (Layer 1).
+  regression-track-4: node .agents/skills/framework-modernizer/evals/run.js

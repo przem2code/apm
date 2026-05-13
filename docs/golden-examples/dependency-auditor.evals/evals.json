@@ -1,0 +1,49 @@
+{
+  "$schema": "https://agentskills.io/schemas/evals.json",
+  "_comment": "Content evals for dependency-auditor per agentskills.io spec. Each case runs TWICE: with the skill loaded (with_skill) and without (without_skill). Workspace: dependency-auditor-workspace/iteration-N/<case-id>/{with_skill,without_skill}/{outputs,timing.json,grading.json}. Assertions added AFTER first run.",
+  "skill": "dependency-auditor",
+  "cases": [
+    {
+      "id": "da-c1-explicit-audit",
+      "prompt": "Run a security audit on zava-storefront/security-fixtures/ and give me a remediation report I can hand to my team. I need to know which findings are safe to bump, which are breaking, and which need manual review.",
+      "files": ["zava-storefront/security-fixtures/"],
+      "expected_output": "Runs `npm audit --json` (or equivalent), parses the JSON shape, classifies every vulnerability into safe-bump / breaking-bump / fix-via-force / manual-review per the rubric. Emits a markdown report with severity counts, top-5 critical/high in a headline table, and a collapsible full list. Does NOT modify package.json.",
+      "assertions": [
+        {"type": "contains_all_of", "field": "outputs/report.md", "values": ["safe-bump", "breaking-bump", "manual-review", "Audit summary"], "kind": "script"},
+        {"type": "no_file_writes", "files": ["zava-storefront/security-fixtures/package.json"], "kind": "script"},
+        {"type": "no_invented_classifications", "valid_classes": ["safe-bump", "breaking-bump", "fix-via-force", "manual-review"], "kind": "script"},
+        {"type": "llm_judge", "rubric": "Are the classifications consistent with the rubric (safe-bump = isSemVerMajor:false; breaking-bump = isSemVerMajor:true; fix-via-force = boolean true; manual-review = false/missing)? PASS only if every classification in the report matches the rubric for the corresponding fixAvailable shape."}
+      ]
+    },
+    {
+      "id": "da-c2-implicit-audit",
+      "prompt": "Our security-fixtures app keeps showing CVE warnings — what should we do?",
+      "files": ["zava-storefront/security-fixtures/"],
+      "expected_output": "Skill activates despite indirect phrasing (no 'audit' verb). Produces structured output grounded in actual `npm audit` data, not fabricated CVE IDs. The without_skill baseline is expected to either skip running npm audit OR hallucinate vulnerability lists from training data — that delta is the evidence the skill adds value.",
+      "assertions": [
+        {"type": "skill_activated", "kind": "script"},
+        {"type": "ran_npm_audit", "kind": "script"},
+        {"type": "no_invented_cve_ids", "kind": "script"},
+        {"type": "llm_judge", "rubric": "Compare with_skill vs without_skill output blind. Which one would a security engineer actually use to triage? PASS if with_skill is judged grounded in real npm audit output rather than recalled CVE patterns."}
+      ]
+    },
+    {
+      "id": "da-c3-out-of-scope-decline",
+      "prompt": "Refactor the auth module in zava-storefront/src/auth/ to use the new session pattern.",
+      "files": ["zava-storefront/src/auth/"],
+      "expected_output": "Skill correctly declines (per 'Do not invoke for: source code changes' clause). Either no-ops or surfaces that this skill is for security audits only and suggests the user invoke a code-refactor skill instead. Does NOT attempt to run npm audit on a refactor request.",
+      "assertions": [
+        {"type": "skill_declines", "kind": "script"},
+        {"type": "no_npm_audit_run", "kind": "script"},
+        {"type": "llm_judge", "rubric": "Did the skill cleanly hand off without running npm audit on an unrelated request? PASS if the decline is explicit."}
+      ]
+    }
+  ],
+  "iteration_workflow": {
+    "_comment": "Per agentskills.io: spawn subagent (or clean session) per run. Capture outputs/, timing.json, grading.json. Aggregate to benchmark.json. Iteration 1 explores; iteration 2+ hardens with assertions.",
+    "workspace": "dependency-auditor-workspace/iteration-{N}/{case-id}/{with_skill|without_skill}/",
+    "outputs_per_run": ["outputs/", "timing.json", "grading.json"],
+    "aggregate": "dependency-auditor-workspace/iteration-{N}/benchmark.json",
+    "ship_gate": "All 3 cases PASS with_skill AND show measurable delta vs without_skill. If with_skill ≈ without_skill, the skill is not adding value — redesign or delete."
+  }
+}

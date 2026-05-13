@@ -1,0 +1,35 @@
+{
+  "$schema": "https://agentskills.io/schemas/triggers.json",
+  "_comment": "Trigger evals for the dependency-auditor dispatch description per agentskills.io spec. ~20 queries 60/40 train/val. Validation split is the ship gate.",
+  "skill": "dependency-auditor",
+  "split": {"train_pct": 60, "val_pct": 40},
+  "should_trigger": [
+    {"split": "train", "query": "Run a security audit on zava-storefront/security-fixtures/"},
+    {"split": "train", "query": "Audit our security-fixtures dependencies"},
+    {"split": "train", "query": "What CVEs are open in security-fixtures right now?"},
+    {"split": "train", "query": "Do we have any vulnerable npm packages in security-fixtures?"},
+    {"split": "train", "query": "Generate a remediation report for security-fixtures vulnerabilities"},
+    {"split": "train", "query": "Triage the npm audit findings on security-fixtures"},
+    {"split": "val", "query": "Our security-fixtures app keeps showing CVE warnings — what should we do?"},
+    {"split": "val", "query": "Security review of security-fixtures dependency tree"},
+    {"split": "val", "query": "PR opened bumping security-fixtures/package.json — review it"},
+    {"split": "val", "query": "I need a markdown report ranking our security-fixtures vulnerabilities"}
+  ],
+  "should_not_trigger": [
+    {"split": "train", "query": "Refactor the auth module in zava-storefront/src/auth/", "reason": "source code change, not security audit"},
+    {"split": "train", "query": "Update package-lock.json after we ran npm install", "reason": "lockfile-only, not audit"},
+    {"split": "train", "query": "Audit zava-platform — it's a Python repo", "reason": "no package.json"},
+    {"split": "train", "query": "Run the test suite", "reason": "testing, not security"},
+    {"split": "train", "query": "Migrate to Express 5", "reason": "framework migration — different skill"},
+    {"split": "train", "query": "Generate JSDoc for our utils module", "reason": "docs, not audit"},
+    {"split": "val", "query": "Why is npm install slow?", "reason": "perf, not security"},
+    {"split": "val", "query": "Add a new dependency: lodash", "reason": "new dep, not audit"},
+    {"split": "val", "query": "Remove unused dependencies from package.json", "reason": "cleanup, not security"},
+    {"split": "val", "query": "Configure dependabot for the repo", "reason": "tooling config, not audit run"}
+  ],
+  "ship_gate": {
+    "should_trigger_rate_min": 0.5,
+    "should_not_trigger_rate_max": 0.5,
+    "evaluated_on": "val"
+  }
+}

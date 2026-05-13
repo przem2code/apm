@@ -1,0 +1,9 @@
+# dependency-auditor golden classifications — security-fixtures/ live audit
+# Format:  package<TAB>severity<TAB>kind<TAB>fixVersion
+# Generated from `npm audit --json` against zava-storefront/security-fixtures/
+# at apm 0.12.2 / npm 11.11.0 / 2026-05-07. If npm advisory data drifts, this
+# file is the source of truth for "what should the classifier emit today" —
+# update it together with the SKILL rubric.
+axios	high	safe-bump	0.21.4
+lodash	critical	safe-bump	4.18.1
+minimist	critical	breaking-bump	1.2.8
