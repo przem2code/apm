@@ -4,3 +4,4 @@ This file exists only to exercise the cross-agent review loop.
 
 Expected reviewer: Codex.
 
+Second head for the corrected parallel proof run.
