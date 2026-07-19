@@ -81,6 +81,18 @@ function loadExpected() {
     .join('\n');
 }
 
+// Pre-flight: a missing fixture tree or expected file would otherwise surface
+// as a raw ENOENT stack trace — or, worse, as a zero-findings scan that
+// compares equal to an empty expected file and prints a green PASS.
+if (!fs.existsSync(FIXTURE_DIR) || !fs.statSync(FIXTURE_DIR).isDirectory()) {
+  console.log(`❌ fixtures dir missing: ${FIXTURE_DIR}`);
+  process.exit(1);
+}
+if (!fs.existsSync(EXPECTED_FILE) || !fs.statSync(EXPECTED_FILE).isFile()) {
+  console.log(`❌ expected findings file missing: ${EXPECTED_FILE}`);
+  process.exit(1);
+}
+
 const actual = serialize(scan());
 const expected = loadExpected();
 
