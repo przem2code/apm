@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Lendrail v2 architecture — mermaid diagram edition: system topology, checkout sequence, kernel internals, package graph.">
-<title>Lendrail v2 — Architecture</title>
+<meta name="description" content="Lendrail v2 entity &amp; white-label brand map — the product, the sibling brand skins, the merchants, and the waterfall lenders.">
+<title>Lendrail v2 — Entities &amp; Brands</title>
 <style>
   :root {
     --bg: #F6FAF9;
@@ -86,6 +86,12 @@
   table.ports { border-collapse: collapse; font-size: .9rem; margin-top: .5rem; font-variant-numeric: tabular-nums; }
   table.ports th, table.ports td { text-align: left; padding: .3rem .9rem .3rem 0; border-bottom: 1px solid var(--line); }
   table.ports th { font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .tablewrap { overflow-x: auto; margin-top: 1rem; }
+  table.layers { border-collapse: collapse; font-size: .88rem; min-width: 46rem; }
+  table.layers th, table.layers td { text-align: left; padding: .45rem .8rem; border: 1px solid var(--line); vertical-align: top; }
+  table.layers th { font-weight: 600; font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: var(--code-bg); }
+  table.layers td:first-child { font-weight: 600; white-space: nowrap; }
+  p.keyrel { max-width: 75ch; margin: 1rem 0 0; padding: .7rem .9rem; border-left: 3px solid var(--accent); background: var(--code-bg); border-radius: 0 6px 6px 0; }
   ul.inv { margin: .4rem 0 0; padding-left: 1.2rem; max-width: 75ch; }
   ul.inv li { margin-bottom: .55rem; }
   ul.inv b { color: var(--accent); font-weight: 600; }
@@ -94,246 +100,83 @@
 </head>
 <body>
 <header class="mast">
-  <p class="eyebrow">lendrail v2 · architecture · 2026-07</p>
-  <h1>Multi-lender POS finance, event-sourced</h1>
-  <p class="sub">Clean-room rebuild of a point-of-sale finance orchestration platform: merchants embed a checkout
-  widget, a waterfall router places each application with one of three simulated lenders behind a sealed adapter
-  boundary, and the platform carries the full lifecycle — offers, webhooks, settlement, reconciliation, disputes,
-  and consumer loan servicing. TypeScript monorepo; one Fastify kernel; an append-only JSONL journal as the only store.</p>
+  <p class="eyebrow">lendrail v2 · entity &amp; brand map · 2026-07</p>
+  <h1>Who is who: the product, the skins, the sellers, the lenders</h1>
+  <p class="sub">The map of the fictional entities you can observe across the demos, and how they relate —
+  the three layers people confuse: <b>Lendrail</b> the platform, the two sibling white-label brand skins
+  (<b>Aurora Pay</b> and <b>Granite Finance</b>), and the separate selling (merchants) and funding
+  (waterfall lenders) layers.</p>
 </header>
 
 <main>
 
 <section>
-  <p class="eyebrow">1 · system topology</p>
-  <h2>Who talks to what</h2>
-  <p class="lede">Every surface converges on the single platform process at <code>:7401</code>. The React SPAs are
-  served by dependency-free static servers and call the platform directly from the browser; the two Fastify
-  storefronts go through the typed SDK. Lender “sims” are in-process adapters — there is no lender network hop.</p>
-  <div class="sheet">
-<pre class="mermaid">
-%%{init: {"theme": "neutral", "flowchart": {"curve": "basis"}} }%%
-flowchart LR
-  classDef actor fill:#EFE9DC,stroke:#8A7B5C,color:#3B3423
-  classDef app fill:#E3EEF7,stroke:#2C3E5D,color:#1C2A40
-  classDef plat fill:#DDF0EE,stroke:#0E7C7B,color:#0B3B3A,stroke-width:2px
-  classDef store fill:#F3EBDD,stroke:#A97A24,color:#4A3510
-
-  shopper(["Shopper"]):::actor
-  consumer(["Borrower"]):::actor
-  ops(["Merchant admin / Lender ops"]):::actor
-
-  subgraph storefronts["Storefronts (Fastify, via @lendrail/sdk)"]
-    voltora["Voltora Electronics :7410"]:::app
-    kestrel["Kestrel Cycles :7414"]:::app
-    larkspur["Larkspur demo-cart<br/>(integration-kit only)"]:::app
-  end
-
-  subgraph spas["Browser SPAs (static serve.mjs)"]
-    dashboard["Dashboard :7412<br/>Aurora Pay / Granite Finance"]:::app
-    lenderops["LenderOps console :7413"]:::app
-    servicing["Servicing PWA :7440"]:::app
-    portal["Dev portal :7432 · Explorer :7420<br/>Docs · Landing :7431"]:::app
-  end
-
-  widget["Checkout widget<br/>iframe + lr:* postMessage"]:::app
-
-  platform["Platform kernel :7401<br/>Fastify · HAL · zod · JWT"]:::plat
-  journal[("data/journal/*.jsonl<br/>append-only event store")]:::store
-
-  shopper --> voltora & kestrel & larkspur
-  shopper --> widget
-  consumer --> servicing
-  ops --> dashboard & lenderops
-
-  voltora & kestrel & larkspur -- "SDK · REST + webhooks" --> platform
-  widget -- "hosted step pages (iframe)" --> platform
-  dashboard -- "/admin/*" --> platform
-  lenderops -- "/lenderops/*" --> platform
-  servicing -- "/consumer/*" --> platform
-  platform --> journal
-</pre>
-  </div>
-  <div class="foot">
-    <span>entry <span class="path">packages/platform/src/main.ts</span></span>
-    <span>routes <span class="path">http/server.ts</span></span>
-    <span>ports &amp; creds <span class="path">packages/spec/conventions.json</span></span>
-  </div>
-</section>
-
-<section>
-  <p class="eyebrow">2 · checkout data flow</p>
-  <h2>An application, end to end</h2>
-  <p class="lede">The store mints a client-access token via the SDK; the widget mounts the platform’s hosted pages in
-  an iframe and speaks the origin-checked <code>lr:*</code> protocol. Routing is a strict waterfall — the router
-  sequences and records but never decides; declines probe remaining lenders for a counter-offer. Order events come
-  back to the store as HMAC-signed webhooks with a virtual-clock retry ladder.</p>
-  <div class="sheet">
-<pre class="mermaid">
-%%{init: {"theme": "neutral"} }%%
-sequenceDiagram
-  autonumber
-  participant S as Store (SDK)
-  participant W as Widget (iframe)
-  participant P as Platform :7401
-  participant R as Waterfall router
-  participant L as Ironbridge → Fernway → Brightloan
-  participant J as Journal (events.jsonl)
-
-  S->>P: POST /auth → JWT, POST /init (basket) → CAC token
-  S-->>W: window.lendrail.init(tokenLoader)
-  W->>P: mount hosted step pages (lr:* postMessage, origin-checked)
-  P->>R: decideWithWaterfall(application)
-  R->>L: assess(DTO) in priority order
-  L-->>R: approve / refer / decline (+ counter-offer probe)
-  R-->>P: RoutedInvocation, recorded verbatim
-  P->>J: append events (virtual-clock timers re-arm on boot)
-  P--)S: signed webhook → /webhooks/lendrail (retry 10s→…→12h)
-  S->>P: verify HMAC locally + GET /key/keyId/verify
-  Note over P,J: SettlementEngine flips SUCCESSFUL→SETTLED per lender calendar —<br/>independent reconciler re-folds the raw journal and must agree
-</pre>
-  </div>
-  <div class="foot">
-    <span>router <span class="path">lenders/router.ts</span></span>
-    <span>outbox <span class="path">webhooks/outbox.ts</span></span>
-    <span>widget protocol <span class="path">packages/widget/src/protocol.ts</span></span>
-    <span>receiver <span class="path">apps/store/src/receiver.ts</span></span>
-  </div>
-</section>
-
-<section>
-  <p class="eyebrow">3 · platform internals</p>
-  <h2>Inside the kernel</h2>
-  <p class="lede">One process, event-sourced: commands append to the journal, projections fold it into in-memory
-  read models, and everything time-based — lender decision delays, checkout expiry, webhook retries, settlement
-  runs, retention sweeps — runs on a single virtual clock (advanceable in sandbox). The lender boundary is sealed:
-  adapters see DTOs only, never the store, clock, or HTTP.</p>
+  <p class="eyebrow">the cast · who is who</p>
+  <h2>Entities &amp; white-label brands — the map of who is who</h2>
+  <p class="lede"><b>Lendrail</b> is the product — the orchestration platform, never a consumer-facing brand.
+  What shoppers and borrowers actually <em>see</em> is one of two sibling brand skins, <b>Aurora Pay</b> and
+  <b>Granite Finance</b>: interchangeable CSS token packs over the exact same platform surfaces — same DOM,
+  different pixels. Merchants sit on the selling layer, the three simulated lenders on the funding layer;
+  neither competes with the skins.</p>
   <div class="sheet">
 <pre class="mermaid">
 %%{init: {"theme": "neutral", "flowchart": {"curve": "basis"}} }%%
 flowchart TB
-  classDef http fill:#E3EEF7,stroke:#2C3E5D,color:#1C2A40
-  classDef core fill:#DDF0EE,stroke:#0E7C7B,color:#0B3B3A
-  classDef seal fill:#F6E3DF,stroke:#A8433B,color:#5A1F18
-  classDef async fill:#F3EBDD,stroke:#A97A24,color:#4A3510
-  classDef store fill:#EFE9DC,stroke:#8A7B5C,color:#3B3423
+  classDef prod fill:#DDF0EE,stroke:#0E7C7B,color:#0B3B3A,stroke-width:2px
+  classDef shop fill:#E3EEF7,stroke:#2C3E5D,color:#1C2A40
+  classDef aurora fill:#D2ECE9,stroke:#0E7C7B,color:#0B3B3A
+  classDef granite fill:#DFE6F2,stroke:#2C3E5D,color:#1C2A40
+  classDef lender fill:#F6E3DF,stroke:#A8433B,color:#5A1F18
+  classDef legend fill:#F3EBDD,stroke:#A97A24,color:#4A3510
 
-  subgraph HTTP["HTTP surface — http/server.ts (Fastify, HAL, zod)"]
-    pub["Public + merchant<br/>/auth /init /checkout /application /transaction"]:::http
-    hosted["Hosted step pages<br/>/hosted/* + PDF · QR · receipt"]:::http
-    admin["/admin/* dashboard API<br/>RBAC · 2FA · reports · clock/advance"]:::http
-    lops["/lenderops/*<br/>queue · underwriting · settlements"]:::http
-    cons["/consumer/*<br/>OTP auth · loans · settle"]:::http
+  product["L E N D R A I L<br/>the actual product — the orchestration platform,<br/>NOT a consumer-facing brand"]:::prod
+
+  subgraph SELLS["WHO SELLS — merchant surface"]
+    volt["Voltora Electronics :7410<br/>demo shop / PDP"]:::shop
+    kest["Kestrel Cycles :7414"]:::shop
+    lark["Larkspur Home &amp; Garden<br/>demo-cart via integration-kit"]:::shop
   end
 
-  subgraph KERNEL["Kernel — platform.ts"]
-    cmd["Command handlers"]:::core
-    proj["Projections → DomainState<br/>(in-memory read models)"]:::core
-    clock["VirtualClock — core/clock.ts<br/>all timers, sandbox-advanceable"]:::core
+  subgraph LOOKS["HOW IT LOOKS — white-label brand skins"]
+    aurora["Aurora Pay<br/>teal · the DEFAULT brand"]:::aurora
+    granite["Granite Finance<br/>navy"]:::granite
+    hownote["pure CSS token packs — same DOM,<br/>different pixels. One swap re-skins the<br/>widget, hosted checkout pages, dashboard<br/>chrome and the servicing PWA together"]:::legend
   end
 
-  subgraph LENDERS["Sealed lender boundary — DTO-only"]
-    registry["LenderRegistry (priority 10/20/30)"]:::seal
-    router["Waterfall router<br/>records, never decides"]:::seal
-    policy["Shared policy engine<br/>score + affordability"]:::seal
-    three["Ironbridge · Fernway · Brightloan<br/>(config, not code)"]:::seal
+  subgraph LENDS["WHO LENDS — waterfall lenders, sealed adapter"]
+    lend["1 · Ironbridge Finance<br/>2 · Fernway Credit<br/>3 · Brightloan<br/>tried top-down until one accepts"]:::lender
   end
 
-  subgraph ASYNC["Clock-driven engines"]
-    notifier["OrderNotifier → WebhookOutbox<br/>HMAC envelopes, retry ladder"]:::async
-    settle["SettlementEngine<br/>per-lender calendars → CSV + remittance"]:::async
-    serv["Servicing: Collection · Revolving<br/>hardship · complaints · statements"]:::async
-    sweep["RetentionSweeper · GDPR export/erase"]:::async
-  end
-
-  subgraph DATA["Persistence — append-only"]
-    ev[("events.jsonl")]:::store
-    wh[("webhook-deliveries.jsonl")]:::store
-    snap[("boot snapshots · PII keys kept outside data dir")]:::store
-  end
-
-  recon["Independent reconciler<br/>re-folds raw journal, must match engine"]:::async
-
-  HTTP --> cmd
-  cmd --> ev
-  ev --> proj
-  proj --> HTTP
-  clock --> ASYNC
-  cmd --> router
-  router --> registry --> policy --> three
-  notifier --> wh
-  settle --> ev
-  ev -. raw refold .-> recon
+  product --> SELLS
+  product --> LOOKS
+  product --> LENDS
+  volt -. "seed tenant → default brand" .-> aurora
+  kest -. "second tenant → navy brand" .-> granite
+  lark -. "portal-issued keys → default" .-> aurora
 </pre>
   </div>
-  <div class="foot">
-    <span>sealed interface <span class="path">lenders/adapter.ts</span></span>
-    <span>event store <span class="path">core/eventStore.ts</span></span>
-    <span>settlement <span class="path">settlement/engine.ts</span></span>
-    <span>reconciler <span class="path">reconcile/reconcile.ts</span></span>
-  </div>
-</section>
-
-<section>
-  <p class="eyebrow">4 · monorepo</p>
-  <h2>Package dependency graph</h2>
-  <p class="lede"><code>spec</code> is the contract everything hangs off — one OpenAPI pair plus
-  <code>conventions.json</code>, the single source for every port, credential, signing key, and magic total.
-  <code>finance-core</code> is pure zero-dependency money math shared by the platform and both widgets.</p>
-  <div class="sheet">
-<pre class="mermaid">
-%%{init: {"theme": "neutral", "flowchart": {"curve": "basis"}} }%%
-flowchart LR
-  classDef contract fill:#DDF0EE,stroke:#0E7C7B,color:#0B3B3A,stroke-width:2px
-  classDef lib fill:#E3EEF7,stroke:#2C3E5D,color:#1C2A40
-  classDef app fill:#F3EBDD,stroke:#A97A24,color:#4A3510
-  classDef test fill:#EFE9DC,stroke:#8A7B5C,color:#3B3423
-
-  spec["spec<br/>OpenAPI + conventions.json"]:::contract
-  fincore["finance-core<br/>money · APR · amortize"]:::lib
-  brands["brand-packs<br/>Aurora Pay · Granite"]:::lib
-  platform["platform"]:::lib
-  sdk["sdk (typed client + webhook verify)"]:::lib
-  widget["widget"]:::lib
-  aprw["apr-widget"]:::lib
-  kit["integration-kit<br/>mountLendrail()"]:::lib
-  finprom["finprom-lint"]:::lib
-
-  stores["store apps ×2"]:::app
-  democart["demo-cart"]:::app
-  spas["dashboard · lenderops · servicing · explorer"]:::app
-  jsim["journey-sim"]:::test
-  csuite["contract-suite (ajv)"]:::test
-
-  spec --> platform & sdk & stores & spas & csuite
-  fincore --> platform & widget & aprw
-  brands --> platform & widget & stores & spas
-  sdk --> stores & kit & jsim & csuite
-  widget --> stores & kit
-  kit --> democart
-  platform -.-> csuite
-  finprom -. lints portal copy .-> spas
-</pre>
-  </div>
-  <table class="ports">
-    <tr><th>Surface</th><th>Port</th><th>Serving</th></tr>
-    <tr><td>Platform API</td><td>7401</td><td>Fastify (the kernel)</td></tr>
-    <tr><td>Voltora Electronics / Kestrel Cycles</td><td>7410 / 7414</td><td>Fastify + SDK</td></tr>
-    <tr><td>Dashboard / LenderOps / Servicing PWA</td><td>7412 / 7413 / 7440</td><td>React SPA, static <code>serve.mjs</code></td></tr>
-    <tr><td>Explorer / Landing / Portal</td><td>7420 / 7431 / 7432</td><td>static + node:http</td></tr>
+  <div class="tablewrap">
+  <table class="layers">
+    <tr><th>Layer</th><th>Entities</th><th>What it is</th><th>Where in the repo</th></tr>
+    <tr><td>Platform</td><td>Lendrail</td>
+        <td>The product itself — router, lifecycle, webhooks, settlement, servicing</td>
+        <td><span class="path">packages/platform</span></td></tr>
+    <tr><td>White-label brands</td><td><b>Aurora Pay</b> (teal, default) · <b>Granite Finance</b> (navy)</td>
+        <td>Cosmetic <em>skins</em> of Lendrail's surfaces — swapping one changes only CSS tokens, never markup</td>
+        <td><span class="path">packages/brand-packs</span></td></tr>
+    <tr><td>Merchants</td><td>Voltora Electronics · Kestrel Cycles · Larkspur</td>
+        <td>Demo shops that embed the checkout widget (Larkspur through the integration-kit alone)</td>
+        <td><span class="path">apps/store</span> · <span class="path">apps/demo-cart</span></td></tr>
+    <tr><td>Lenders</td><td>Ironbridge Finance → Fernway Credit → Brightloan</td>
+        <td>Three simulated lenders the router tries top-down in a waterfall</td>
+        <td><span class="path">platform/src/lenders</span></td></tr>
   </table>
-</section>
-
-<section>
-  <p class="eyebrow">5 · invariants</p>
-  <h2>What holds it together</h2>
-  <ul class="inv">
-    <li><b>Sealed adapters.</b> Lenders implement <code>assess(DTO) → assessment</code> and nothing else; the waterfall router is grep-gated to contain no outcome-string literals — it records decisions, it never makes them.</li>
-    <li><b>Two-derivation settlement.</b> The reconciler recomputes every report column from the raw journal, forbidden from importing engine aggregation; the numbers must agree.</li>
-    <li><b>One clock.</b> No cron, no polling loops — every delay, retry, expiry, and settlement run hangs off the virtual clock, so the whole timeline is advanceable and deterministic in sandbox.</li>
-    <li><b>One config source.</b> Ports, seed tenants, signing keys, and magic totals live only in <code>packages/spec/conventions.json</code>.</li>
-    <li><b>Gated delivery.</b> <code>tools/gates/all.sh</code> (WI-0…WI-20 acceptance gates + trademark and clean-room greps) is the Definition of Done; each WI ships with a Playwright screenshot tour under <code>demos/</code>.</li>
-  </ul>
+  </div>
+  <p class="keyrel"><b>The key relationship:</b> Aurora Pay and Granite Finance are <em>siblings</em> — two
+  interchangeable brand skins of the <em>same</em> Lendrail platform, not separate businesses. A merchant portal
+  showing “Aurora Pay” is simply the default brand; the tenant decides the skin (Voltora → Aurora Pay,
+  Kestrel → Granite Finance). Everything else — who's selling (merchants) and who's funding (lenders) — sits on
+  different layers and doesn't compete with the skins.</p>
 </section>
 
 </main>
