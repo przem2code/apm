@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Lendrail v2 architecture — mermaid diagram edition: system topology, checkout sequence, kernel internals, package graph.">
+<meta name="description" content="Lendrail v2 architecture — mermaid diagram edition: entity &amp; brand map, system topology, checkout sequence, kernel internals, package graph.">
 <title>Lendrail v2 — Architecture</title>
 <style>
   :root {
@@ -86,6 +86,12 @@
   table.ports { border-collapse: collapse; font-size: .9rem; margin-top: .5rem; font-variant-numeric: tabular-nums; }
   table.ports th, table.ports td { text-align: left; padding: .3rem .9rem .3rem 0; border-bottom: 1px solid var(--line); }
   table.ports th { font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .tablewrap { overflow-x: auto; margin-top: 1rem; }
+  table.layers { border-collapse: collapse; font-size: .88rem; min-width: 46rem; }
+  table.layers th, table.layers td { text-align: left; padding: .45rem .8rem; border: 1px solid var(--line); vertical-align: top; }
+  table.layers th { font-weight: 600; font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: var(--code-bg); }
+  table.layers td:first-child { font-weight: 600; white-space: nowrap; }
+  p.keyrel { max-width: 75ch; margin: 1rem 0 0; padding: .7rem .9rem; border-left: 3px solid var(--accent); background: var(--code-bg); border-radius: 0 6px 6px 0; }
   ul.inv { margin: .4rem 0 0; padding-left: 1.2rem; max-width: 75ch; }
   ul.inv li { margin-bottom: .55rem; }
   ul.inv b { color: var(--accent); font-weight: 600; }
@@ -105,7 +111,76 @@
 <main>
 
 <section>
-  <p class="eyebrow">1 · system topology</p>
+  <p class="eyebrow">1 · the cast</p>
+  <h2>Entities &amp; white-label brands — the map of who is who</h2>
+  <p class="lede"><b>Lendrail</b> is the product — the orchestration platform, never a consumer-facing brand.
+  What shoppers and borrowers actually <em>see</em> is one of two sibling brand skins, <b>Aurora Pay</b> and
+  <b>Granite Finance</b>: interchangeable CSS token packs over the exact same platform surfaces — same DOM,
+  different pixels. Merchants sit on the selling layer, the three simulated lenders on the funding layer;
+  neither competes with the skins.</p>
+  <div class="sheet">
+<pre class="mermaid">
+%%{init: {"theme": "neutral", "flowchart": {"curve": "basis"}} }%%
+flowchart TB
+  classDef prod fill:#DDF0EE,stroke:#0E7C7B,color:#0B3B3A,stroke-width:2px
+  classDef shop fill:#E3EEF7,stroke:#2C3E5D,color:#1C2A40
+  classDef aurora fill:#D2ECE9,stroke:#0E7C7B,color:#0B3B3A
+  classDef granite fill:#DFE6F2,stroke:#2C3E5D,color:#1C2A40
+  classDef lender fill:#F6E3DF,stroke:#A8433B,color:#5A1F18
+  classDef legend fill:#F3EBDD,stroke:#A97A24,color:#4A3510
+
+  product["L E N D R A I L<br/>the actual product — the orchestration platform,<br/>NOT a consumer-facing brand"]:::prod
+
+  subgraph SELLS["WHO SELLS — merchant surface"]
+    volt["Voltora Electronics :7410<br/>demo shop / PDP"]:::shop
+    kest["Kestrel Cycles :7414"]:::shop
+    lark["Larkspur Home &amp; Garden<br/>demo-cart via integration-kit"]:::shop
+  end
+
+  subgraph LOOKS["HOW IT LOOKS — white-label brand skins"]
+    aurora["Aurora Pay<br/>teal · the DEFAULT brand"]:::aurora
+    granite["Granite Finance<br/>navy"]:::granite
+    hownote["pure CSS token packs — same DOM,<br/>different pixels. One swap re-skins the<br/>widget, hosted checkout pages, dashboard<br/>chrome and the servicing PWA together"]:::legend
+  end
+
+  subgraph LENDS["WHO LENDS — waterfall lenders, sealed adapter"]
+    lend["1 · Ironbridge Finance<br/>2 · Fernway Credit<br/>3 · Brightloan<br/>tried top-down until one accepts"]:::lender
+  end
+
+  product --> SELLS
+  product --> LOOKS
+  product --> LENDS
+  volt -. "seed tenant → default brand" .-> aurora
+  kest -. "second tenant → navy brand" .-> granite
+  lark -. "portal-issued keys → default" .-> aurora
+</pre>
+  </div>
+  <div class="tablewrap">
+  <table class="layers">
+    <tr><th>Layer</th><th>Entities</th><th>What it is</th><th>Where in the repo</th></tr>
+    <tr><td>Platform</td><td>Lendrail</td>
+        <td>The product itself — router, lifecycle, webhooks, settlement, servicing</td>
+        <td><span class="path">packages/platform</span></td></tr>
+    <tr><td>White-label brands</td><td><b>Aurora Pay</b> (teal, default) · <b>Granite Finance</b> (navy)</td>
+        <td>Cosmetic <em>skins</em> of Lendrail's surfaces — swapping one changes only CSS tokens, never markup</td>
+        <td><span class="path">packages/brand-packs</span></td></tr>
+    <tr><td>Merchants</td><td>Voltora Electronics · Kestrel Cycles · Larkspur</td>
+        <td>Demo shops that embed the checkout widget (Larkspur through the integration-kit alone)</td>
+        <td><span class="path">apps/store</span> · <span class="path">apps/demo-cart</span></td></tr>
+    <tr><td>Lenders</td><td>Ironbridge Finance → Fernway Credit → Brightloan</td>
+        <td>Three simulated lenders the router tries top-down in a waterfall</td>
+        <td><span class="path">platform/src/lenders</span></td></tr>
+  </table>
+  </div>
+  <p class="keyrel"><b>The key relationship:</b> Aurora Pay and Granite Finance are <em>siblings</em> — two
+  interchangeable brand skins of the <em>same</em> Lendrail platform, not separate businesses. A merchant portal
+  showing “Aurora Pay” is simply the default brand; the tenant decides the skin (Voltora → Aurora Pay,
+  Kestrel → Granite Finance). Everything else — who's selling (merchants) and who's funding (lenders) — sits on
+  different layers and doesn't compete with the skins.</p>
+</section>
+
+<section>
+  <p class="eyebrow">2 · system topology</p>
   <h2>Who talks to what</h2>
   <p class="lede">Every surface converges on the single platform process at <code>:7401</code>. The React SPAs are
   served by dependency-free static servers and call the platform directly from the browser; the two Fastify
@@ -162,7 +237,7 @@ flowchart LR
 </section>
 
 <section>
-  <p class="eyebrow">2 · checkout data flow</p>
+  <p class="eyebrow">3 · checkout data flow</p>
   <h2>An application, end to end</h2>
   <p class="lede">The store mints a client-access token via the SDK; the widget mounts the platform’s hosted pages in
   an iframe and speaks the origin-checked <code>lr:*</code> protocol. Routing is a strict waterfall — the router
@@ -202,7 +277,7 @@ sequenceDiagram
 </section>
 
 <section>
-  <p class="eyebrow">3 · platform internals</p>
+  <p class="eyebrow">4 · platform internals</p>
   <h2>Inside the kernel</h2>
   <p class="lede">One process, event-sourced: commands append to the journal, projections fold it into in-memory
   read models, and everything time-based — lender decision delays, checkout expiry, webhook retries, settlement
@@ -275,7 +350,7 @@ flowchart TB
 </section>
 
 <section>
-  <p class="eyebrow">4 · monorepo</p>
+  <p class="eyebrow">5 · monorepo</p>
   <h2>Package dependency graph</h2>
   <p class="lede"><code>spec</code> is the contract everything hangs off — one OpenAPI pair plus
   <code>conventions.json</code>, the single source for every port, credential, signing key, and magic total.
@@ -325,7 +400,7 @@ flowchart LR
 </section>
 
 <section>
-  <p class="eyebrow">5 · invariants</p>
+  <p class="eyebrow">6 · invariants</p>
   <h2>What holds it together</h2>
   <ul class="inv">
     <li><b>Sealed adapters.</b> Lenders implement <code>assess(DTO) → assessment</code> and nothing else; the waterfall router is grep-gated to contain no outcome-string literals — it records decisions, it never makes them.</li>
