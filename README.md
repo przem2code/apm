@@ -210,3 +210,5 @@ That's the difference between an ad hoc prompt and a packaged Agent Skill: **dis
 ## 📝 Workshop reference
 
 This template is **Artifact #5** of the Zava agentic SDLC workshop. Org administrators provisioning the workshop should start at [`DevExpGbb/zava-workshop-kit`](https://github.com/DevExpGbb/zava-workshop-kit).
+
+self-review stage end-to-end probe (opted in)
